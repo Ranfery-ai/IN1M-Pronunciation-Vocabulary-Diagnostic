@@ -31,6 +31,8 @@ const DEFAULT_WORDS = [
   {word:"hope", ipa:"hoʊp"}
 ];
 
+const BACKEND_URL = "https://in1m-pronunciation-api.onrender.com";
+
 let words = loadWords();
 let index = Number(localStorage.getItem("in1m_index") || 0);
 let results = JSON.parse(localStorage.getItem("in1m_results") || "{}");
@@ -50,15 +52,141 @@ const heardText = el("heardText");
 const correctionBox = el("correctionBox");
 const correctionText = el("correctionText");
 
-const BACKEND_URL =
-  "https://in1m-pronunciation-api.onrender.com";
-
 let mediaRecorder = null;
 let audioChunks = [];
 let recordingBusy = false;
 
-async function recordAudioBlob() {
+function current() {
+  return words[index];
+}
 
+function resultKey(i = index) {
+  return `${i}:${words[i]?.word || ""}`;
+}
+
+function resultFor(i = index) {
+  const key = resultKey(i);
+
+  if (!results[key]) {
+    results[key] = { attempts: [] };
+  }
+
+  if (!Array.isArray(results[key].attempts)) {
+    results[key].attempts = [];
+  }
+
+  return results[key];
+}
+
+function save() {
+  localStorage.setItem("in1m_words", JSON.stringify(words));
+  localStorage.setItem("in1m_index", String(index));
+  localStorage.setItem("in1m_results", JSON.stringify(results));
+}
+
+function setChoice(groupId, attr, value) {
+  document.querySelectorAll(`#${groupId} button`).forEach(btn => {
+    btn.classList.toggle(
+      "selected",
+      btn.dataset[attr] === value
+    );
+  });
+}
+
+function neutral(title, detail) {
+  statusBox.className = "status neutral";
+  statusTitle.textContent = title;
+  heardText.textContent = detail;
+  correctionBox.classList.add("hidden");
+}
+
+function showResult(pass, heard, score, revealCorrection = true) {
+  const attempts = resultFor().attempts.length;
+
+  if (pass) {
+    statusBox.className = "status good";
+
+    statusTitle.textContent =
+      attempts === 1
+        ? "✓ RECOGNIZED — FIRST TRY"
+        : "✓ RECOGNIZED";
+
+    heardText.textContent =
+      `Whisper heard: “${heard || "—"}” · Match ${Math.round(score * 100)}%`;
+
+    correctionBox.classList.add("hidden");
+
+  } else {
+    statusBox.className = "status bad";
+    statusTitle.textContent = "✗ TRY AGAIN";
+
+    heardText.textContent =
+      `Whisper heard: “${heard || "—"}” · Match ${Math.round(score * 100)}%`;
+
+    if (revealCorrection) {
+      correctionText.textContent = current().ipa
+        ? `${current().word} /${current().ipa}/ — Listen, imitate, then try again.`
+        : `${current().word} — Listen, imitate, then try again.`;
+
+      correctionBox.classList.remove("hidden");
+      ipaEl.classList.remove("hidden");
+    }
+  }
+}
+
+function render() {
+  const item = current();
+  const r = resultFor();
+
+  wordEl.textContent = item.word;
+
+  ipaEl.textContent =
+    item.ipa
+      ? `/${item.ipa}/`
+      : "Pronunciation unavailable";
+
+  ipaEl.classList.add("hidden");
+
+  progressText.textContent =
+    `Word ${index + 1} of ${words.length}`;
+
+  progressBar.style.width =
+    `${((index + 1) / words.length) * 100}%`;
+
+  setChoice(
+    "knowledgeChoices",
+    "knowledge",
+    r.knowledge || ""
+  );
+
+  setChoice(
+    "confidenceChoices",
+    "confidence",
+    r.confidence || ""
+  );
+
+  if (r.attempts.length) {
+    const last =
+      r.attempts[r.attempts.length - 1];
+
+    showResult(
+      last.pass,
+      last.heard,
+      last.score,
+      false
+    );
+  } else {
+    neutral(
+      "Ready.",
+      "Choose your answers, then say the word."
+    );
+  }
+
+  updateSummary();
+  save();
+}
+
+async function recordAudioBlob() {
   if (
     !navigator.mediaDevices ||
     !navigator.mediaDevices.getUserMedia
@@ -88,75 +216,70 @@ async function recordAudioBlob() {
   }
 
   mediaRecorder =
-    new MediaRecorder(stream, options);
+    new MediaRecorder(
+      stream,
+      options
+    );
 
-  return new Promise((resolve, reject) => {
+  return new Promise(
+    (resolve, reject) => {
 
-    mediaRecorder.ondataavailable = e => {
+      mediaRecorder.ondataavailable = e => {
+        if (
+          e.data &&
+          e.data.size > 0
+        ) {
+          audioChunks.push(e.data);
+        }
+      };
 
-      if (
-        e.data &&
-        e.data.size > 0
-      ) {
-        audioChunks.push(e.data);
-      }
+      mediaRecorder.onerror = () => {
+        stream
+          .getTracks()
+          .forEach(t => t.stop());
 
-    };
+        reject(
+          new Error(
+            "Microphone recording failed."
+          )
+        );
+      };
 
-    mediaRecorder.onerror = () => {
+      mediaRecorder.onstop = () => {
+        stream
+          .getTracks()
+          .forEach(t => t.stop());
 
-      stream
-        .getTracks()
-        .forEach(t => t.stop());
+        resolve(
+          new Blob(
+            audioChunks,
+            {
+              type:
+                mediaRecorder.mimeType ||
+                "audio/webm"
+            }
+          )
+        );
+      };
 
-      reject(
-        new Error(
-          "Microphone recording failed."
-        )
-      );
+      mediaRecorder.start();
 
-    };
-
-    mediaRecorder.onstop = () => {
-
-      stream
-        .getTracks()
-        .forEach(t => t.stop());
-
-      resolve(
-        new Blob(
-          audioChunks,
-          {
-            type:
-              mediaRecorder.mimeType ||
-              "audio/webm"
-          }
-        )
-      );
-
-    };
-
-    mediaRecorder.start();
-
-    setTimeout(() => {
-
-      if (
-        mediaRecorder &&
-        mediaRecorder.state === "recording"
-      ) {
-        mediaRecorder.stop();
-      }
-
-    }, 2500);
-
-  });
+      setTimeout(() => {
+        if (
+          mediaRecorder &&
+          mediaRecorder.state === "recording"
+        ) {
+          mediaRecorder.stop();
+        }
+      }, 2500);
+    }
+  );
 }
 
 async function evaluateWithWhisper(
   expectedWord,
   blob
 ) {
-
   const form =
     new FormData();
 
@@ -181,7 +304,6 @@ async function evaluateWithWhisper(
     );
 
   if (!response.ok) {
-
     const detail =
       await response.text();
 
@@ -189,24 +311,20 @@ async function evaluateWithWhisper(
       detail ||
       `Speech server error (${response.status}).`
     );
-
   }
 
   return await response.json();
 }
 
 async function startRecognition() {
-
   if (recordingBusy) return;
 
-  const r =
-    resultFor();
+  const r = resultFor();
 
   if (
     !r.knowledge ||
     !r.confidence
   ) {
-
     statusBox.className =
       "status warn";
 
@@ -220,7 +338,6 @@ async function startRecognition() {
   }
 
   try {
-
     recordingBusy = true;
 
     statusBox.className =
@@ -248,21 +365,17 @@ async function startRecognition() {
       );
 
     const record = {
-
       timestamp:
         new Date().toISOString(),
 
       heard:
         result.transcript || "",
 
-      alternatives: [],
-
       score:
         Number(result.score || 0),
 
       pass:
         Boolean(result.pass)
-
     };
 
     r.attempts.push(record);
@@ -275,11 +388,9 @@ async function startRecognition() {
     );
 
     updateSummary();
-
     save();
 
   } catch (err) {
-
     statusBox.className =
       "status bad";
 
@@ -291,18 +402,18 @@ async function startRecognition() {
       "Could not evaluate this attempt.";
 
   } finally {
-
     recordingBusy = false;
-
   }
-
 }
 
 function speakCurrent() {
-
   if (
     !("speechSynthesis" in window)
   ) {
+    alert(
+      "Text-to-speech is not available in this browser."
+    );
+
     return;
   }
 
@@ -324,12 +435,10 @@ function speakCurrent() {
 
   const preferred =
     voices.find(
-      v =>
-        /^en-US/i.test(v.lang)
+      v => /^en-US/i.test(v.lang)
     ) ||
     voices.find(
-      v =>
-        /^en/i.test(v.lang)
+      v => /^en/i.test(v.lang)
     );
 
   if (preferred) {
@@ -340,7 +449,6 @@ function speakCurrent() {
 }
 
 function updateSummary() {
-
   let use = 0;
   let recognize = 0;
   let fresh = 0;
@@ -380,27 +488,22 @@ function updateSummary() {
       if (
         r.attempts?.length
       ) {
-
         tested++;
 
         if (
           r.attempts[0].pass
         ) {
-
           first++;
-
         } else if (
           r.attempts
             .slice(1)
-            .some(a => a.pass)
+            .some(
+              a => a.pass
+            )
         ) {
-
           fixed++;
-
         }
-
       }
-
     });
 
   el("useCount").textContent =
@@ -425,14 +528,13 @@ function updateSummary() {
     `First-try: ${
       tested
         ? Math.round(
-            first / tested * 100
+            (first / tested) * 100
           )
         : 0
     }%`;
 }
 
 function next() {
-
   if (
     index <
     words.length - 1
@@ -444,8 +546,9 @@ function next() {
 }
 
 function prev() {
-
-  if (index > 0) {
+  if (
+    index > 0
+  ) {
     index--;
   }
 
@@ -460,16 +563,16 @@ document
     "click",
     e => {
 
-      const v =
+      const value =
         e.target.dataset.knowledge;
 
-      if (!v) return;
+      if (!value) return;
 
       resultFor().knowledge =
-        v;
+        value;
 
+      save();
       render();
-
     }
   );
 
@@ -481,16 +584,16 @@ document
     "click",
     e => {
 
-      const v =
+      const value =
         e.target.dataset.confidence;
 
-      if (!v) return;
+      if (!value) return;
 
       resultFor().confidence =
-        v;
+        value;
 
+      save();
       render();
-
     }
   );
 
@@ -515,10 +618,11 @@ el("listenBtn")
 el("showBtn")
   .addEventListener(
     "click",
-    () =>
+    () => {
       ipaEl
         .classList
-        .toggle("hidden")
+        .toggle("hidden");
+    }
   );
 
 el("nextBtn")
@@ -543,15 +647,12 @@ el("resetBtn")
           "Erase all IN1M diagnostic results on this device?"
         )
       ) {
-
         results = {};
         index = 0;
 
         save();
         render();
-
       }
-
     }
   );
 
@@ -574,7 +675,6 @@ el("themeBtn")
           ? "1"
           : "0"
       );
-
     }
   );
 
@@ -590,12 +690,14 @@ if (
 }
 
 function parseCSV(text) {
-
   const lines =
     text
       .replace(/\r/g, "")
       .split("\n")
-      .filter(Boolean);
+      .filter(
+        line =>
+          line.trim() !== ""
+      );
 
   if (!lines.length) {
     return [];
@@ -618,11 +720,9 @@ function parseCSV(text) {
     header.indexOf("ipa");
 
   if (wi < 0) {
-
     throw new Error(
       "CSV must contain a column named word."
     );
-
   }
 
   return lines
@@ -643,7 +743,6 @@ function parseCSV(text) {
           );
 
       return {
-
         word:
           parts[wi],
 
@@ -651,9 +750,7 @@ function parseCSV(text) {
           ii >= 0
             ? parts[ii] || ""
             : ""
-
       };
-
     })
     .filter(
       x => x.word
@@ -671,7 +768,6 @@ el("csvInput")
       if (!file) return;
 
       try {
-
         const text =
           await file.text();
 
@@ -681,11 +777,9 @@ el("csvInput")
         if (
           !imported.length
         ) {
-
           throw new Error(
             "No words found."
           );
-
         }
 
         words =
@@ -701,18 +795,14 @@ el("csvInput")
         render();
 
       } catch (err) {
-
         alert(
           err.message
         );
-
       }
-
     }
   );
 
 function exportResults() {
-
   const rows = [[
     "index",
     "word",
@@ -743,10 +833,10 @@ function exportResults() {
 
       const best =
         attempts.reduce(
-          (m, a) =>
+          (max, attempt) =>
             Math.max(
-              m,
-              a.score || 0
+              max,
+              attempt.score || 0
             ),
           0
         );
@@ -758,6 +848,7 @@ function exportResults() {
         r.knowledge || "",
         r.confidence || "",
         attempts.length,
+
         attempts.length
           ? (
               attempts[0].pass
@@ -765,6 +856,7 @@ function exportResults() {
                 : "NO"
             )
           : "",
+
         attempts.some(
           a => a.pass
         )
@@ -774,18 +866,19 @@ function exportResults() {
                 ? "NO"
                 : ""
             ),
+
         attempts.length
           ? attempts[
               attempts.length - 1
             ].heard
           : "",
+
         attempts.length
           ? Math.round(
               best * 100
             )
           : ""
       ]);
-
     }
   );
 
@@ -795,8 +888,8 @@ function exportResults() {
         row =>
           row
             .map(
-              v =>
-                `"${String(v)
+              value =>
+                `"${String(value)
                   .replace(
                     /"/g,
                     '""'
@@ -845,9 +938,7 @@ el("exportBtn")
   );
 
 function loadWords() {
-
   try {
-
     const saved =
       JSON.parse(
         localStorage.getItem(
@@ -863,7 +954,12 @@ function loadWords() {
       return saved;
     }
 
-  } catch {}
+  } catch (e) {
+    console.warn(
+      "Could not load saved word list.",
+      e
+    );
+  }
 
   return DEFAULT_WORDS;
 }
