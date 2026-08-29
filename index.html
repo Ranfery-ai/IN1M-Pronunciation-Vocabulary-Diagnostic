@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#111827" />
-  <title>IN1M Pronunciation Trainer</title>
+  <title>IN1M — Diagnóstico de Vocabulario y Pronunciación</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -12,112 +12,148 @@
     <header class="hero">
       <div>
         <p class="eyebrow">INGLÉS EN UN MES · IN1M</p>
-        <h1>Pronunciation Trainer</h1>
-        <p class="subtitle">Discover what you know. Activate it. Say it.</p>
+        <h1>Diagnóstico de inglés activo</h1>
+        <p class="subtitle">Demuestra lo que puedes usar. Detecta lo que necesitas practicar.</p>
       </div>
-      <button id="themeBtn" class="ghost small" title="Toggle theme">◐</button>
+      <button id="themeBtn" class="ghost small" title="Cambiar tema">◐</button>
     </header>
 
-    <section class="progress-card card">
-      <div class="progress-row">
-        <span id="progressText">Word 1 of 30</span>
-        <span id="scoreText">First-try: 0%</span>
-      </div>
-      <div class="progress-track">
-        <div id="progressBar" class="progress-bar"></div>
-      </div>
+    <section class="mode-grid">
+      <button class="mode-card active" id="vocabModeBtn">
+        <span class="mode-number">1</span>
+        <strong>VOCABULARIO</strong>
+        <small>Usa la palabra en una oración o pasa.</small>
+      </button>
+      <button class="mode-card" id="pronModeBtn">
+        <span class="mode-number">2</span>
+        <strong>PRONUNCIACIÓN</strong>
+        <small>Lee un bloque completo y revisa solo los problemas.</small>
+      </button>
     </section>
 
-    <section class="card word-card">
-      <p class="section-label">WORD</p>
-      <div id="word" class="word">the</div>
-      <div id="ipa" class="ipa hidden">/ðə/</div>
-
-      <div class="step">
-        <p class="prompt">1. What is this word to you?</p>
-        <div class="choice-row" id="knowledgeChoices">
-          <button data-knowledge="USE">USE</button>
-          <button data-knowledge="RECOGNIZE">RECOGNIZE</button>
-          <button data-knowledge="NEW">NEW</button>
+    <section id="vocabPanel">
+      <section class="card progress-card">
+        <div class="progress-row">
+          <span id="vocabProgressText">Palabra 1 de 30</span>
+          <span id="vocabScoreText">Activas: 0</span>
         </div>
-      </div>
-
-      <div class="step">
-        <p class="prompt">2. Do you know how to pronounce it?</p>
-        <div class="choice-row" id="confidenceChoices">
-          <button data-confidence="SURE">I KNOW IT</button>
-          <button data-confidence="UNSURE">I'M NOT SURE</button>
+        <div class="progress-track">
+          <div id="vocabProgressBar" class="progress-bar"></div>
         </div>
-      </div>
+      </section>
 
-      <div class="step">
-        <p class="prompt">3. Say it aloud.</p>
+      <section class="card word-card">
+        <p class="section-label">DIAGNÓSTICO DE VOCABULARIO</p>
+        <p class="instruction">Usa esta palabra en una oración en inglés. Si no puedes usarla o no la conoces, pulsa <strong>PASAR</strong>.</p>
+
+        <div id="vocabWord" class="word">different</div>
+        <div id="vocabIpa" class="ipa hidden"></div>
+
         <div class="action-row">
-          <button id="speakBtn" class="primary">🎙 SAY THE WORD</button>
-          <button id="listenBtn">🔊 LISTEN</button>
-          <button id="showBtn">👁 SHOW PRONUNCIATION</button>
+          <button id="sentenceBtn" class="primary">🎙 USAR EN UNA ORACIÓN</button>
+          <button id="passBtn">⏭ PASAR</button>
+          <button id="vocabListenBtn">🔊 ESCUCHAR PALABRA</button>
         </div>
-      </div>
 
-      <div id="statusBox" class="status neutral">
-        <div id="statusTitle">Ready.</div>
-        <div id="heardText" class="heard">Choose your answers, then say the word.</div>
-      </div>
+        <div id="vocabStatusBox" class="status neutral">
+          <div id="vocabStatusTitle">Listo.</div>
+          <div id="vocabHeardText" class="heard">Di una oración real que incluya la palabra.</div>
+        </div>
 
-      <div id="correctionBox" class="correction hidden">
-        <strong>Try this:</strong>
-        <div id="correctionText"></div>
-      </div>
+        <div class="nav-row">
+          <button id="vocabPrevBtn">← Anterior</button>
+          <button id="vocabRetryBtn">↻ Reintentar</button>
+          <button id="vocabNextBtn" class="primary">Siguiente →</button>
+        </div>
+      </section>
 
-      <div class="nav-row">
-        <button id="prevBtn">← Previous</button>
-        <button id="retryBtn">↻ Try Again</button>
-        <button id="nextBtn" class="primary">Next →</button>
-      </div>
+      <section class="card">
+        <p class="section-label">RESULTADO DE VOCABULARIO</p>
+        <div class="stats-grid vocab-stats">
+          <div class="stat"><span id="activeCount">0</span><small>PALABRAS ACTIVAS</small></div>
+          <div class="stat"><span id="passedCount">0</span><small>PASADAS</small></div>
+          <div class="stat"><span id="attemptedCount">0</span><small>INTENTADAS</small></div>
+        </div>
+        <p class="fineprint">Una palabra cuenta como activa cuando el sistema reconoce la palabra objetivo dentro de una oración con varias palabras.</p>
+      </section>
     </section>
 
-    <section class="card summary-card">
-      <div class="summary-head">
-        <div>
-          <p class="section-label">YOUR ENGLISH RIGHT NOW</p>
-          <h2>Live Diagnostic</h2>
+    <section id="pronPanel" class="hidden">
+      <section class="card">
+        <p class="section-label">DIAGNÓSTICO DE PRONUNCIACIÓN</p>
+        <h2>Lee el bloque completo</h2>
+        <p class="instruction">
+          Lee las palabras <strong>en orden</strong> y con voz natural. No te detengas si dudas.
+          Al terminar, pulsa <strong>DETENER Y ANALIZAR</strong>.
+        </p>
+
+        <div class="block-settings">
+          <label>
+            Tamaño del bloque
+            <select id="blockSizeSelect">
+              <option value="20">20 palabras</option>
+              <option value="30">30 palabras</option>
+              <option value="50" selected>50 palabras</option>
+            </select>
+          </label>
+          <span id="pronBlockLabel">Bloque 1</span>
         </div>
-        <button id="resetBtn" class="danger ghost">Reset</button>
-      </div>
 
-      <div class="stats-grid">
-        <div class="stat"><span id="useCount">0</span><small>USE</small></div>
-        <div class="stat"><span id="recognizeCount">0</span><small>RECOGNIZE</small></div>
-        <div class="stat"><span id="newCount">0</span><small>NEW</small></div>
-        <div class="stat"><span id="doubtCount">0</span><small>PRONUNCIATION DOUBT</small></div>
-        <div class="stat"><span id="firstTryCount">0</span><small>FIRST-TRY RECOGNIZED</small></div>
-        <div class="stat"><span id="fixedCount">0</span><small>FIXED AFTER RETRY</small></div>
-      </div>
+        <div id="pronWordGrid" class="word-grid"></div>
 
+        <div class="action-row recording-actions">
+          <button id="startBatchBtn" class="primary">🎙 INICIAR GRABACIÓN</button>
+          <button id="stopBatchBtn" disabled>⏹ DETENER Y ANALIZAR</button>
+          <button id="listenBlockBtn">🔊 ESCUCHAR BLOQUE</button>
+        </div>
+
+        <div id="pronStatusBox" class="status neutral">
+          <div id="pronStatusTitle">Listo.</div>
+          <div id="pronStatusText" class="heard">Inicia la grabación y lee el bloque de arriba. La primera revisión puede tardar un poco mientras se prepara el análisis.</div>
+        </div>
+
+        <div class="nav-row">
+          <button id="prevBlockBtn">← Bloque anterior</button>
+          <button id="nextBlockBtn" class="primary">Siguiente bloque →</button>
+        </div>
+      </section>
+
+      <section id="pronResultsCard" class="card hidden">
+        <div class="summary-head">
+          <div>
+            <p class="section-label">RESULTADO DEL BLOQUE</p>
+            <h2 id="pronResultHeadline">0 / 0 reconocidas</h2>
+          </div>
+        </div>
+
+        <div id="pronResultGrid" class="result-grid"></div>
+
+        <div id="reviewOnlyBox" class="review-box hidden">
+          <h3>Practica solo estas palabras</h3>
+          <div id="reviewWordList" class="review-list"></div>
+        </div>
+      </section>
+    </section>
+
+    <section class="card tool-card">
+      <div>
+        <p class="section-label">LISTA DE PALABRAS</p>
+        <p class="fineprint">Puedes cargar un CSV con columnas <strong>word</strong> e <strong>ipa</strong>. El mismo listado alimenta ambos diagnósticos.</p>
+      </div>
       <div class="tool-row">
         <label class="file-label">
-          Load word list CSV
+          Cargar CSV
           <input id="csvInput" type="file" accept=".csv,text/csv" />
         </label>
-        <button id="exportBtn">Export Results CSV</button>
+        <button id="exportBtn">Exportar resultados CSV</button>
+        <button id="resetBtn" class="danger ghost">Reiniciar diagnóstico</button>
       </div>
-    </section>
-
-    <section class="card tip-card">
-      <p class="section-label">AI TIP</p>
-      <p>For a NEW word, ask an AI:</p>
-      <blockquote>
-        Define “_____” in very simple English. Do not translate it into Spanish.
-        Give me one easy example, one synonym, one antonym, and tell me how to pronounce it.
-        Then ask me to use the word in my own sentence.
-      </blockquote>
     </section>
 
     <footer>
-      <p><strong>IN1M Word Ownership Path:</strong> NEW → RECOGNIZE → USE</p>
+      <p><strong>IN1M:</strong> no basta con reconocer una palabra. La meta es poder usarla.</p>
       <p class="fineprint">
-        This trainer checks whether browser speech recognition understood the expected word.
-        It is a practice signal, not a clinical accent assessment.
+        El reconocimiento de voz es una señal práctica. No sustituye un análisis fonético clínico o fonema por fonema.
       </p>
     </footer>
   </main>
